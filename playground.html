@@ -169,21 +169,38 @@
         const ctx = canvas.getContext('2d');
         const colorBoxes = document.querySelectorAll('.color-box');
         let isDrawing = false;
-        let brushColor = 'red';
-        let brushSize = 5;
+        
+        const colorMap = {
+            red: '255, 0, 0',
+            yellow: '255, 255, 0',
+            blue: '0, 0, 255'
+        };
+        let brushColor = `rgba(${colorMap.red}, 0.8)`;
+        let brushSize = 4;
 
         function resizeCanvas() {
             // Save the current drawing
             const drawing = canvas.toDataURL();
             
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            // Adjust for high-DPI displays
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+
+            // Scale the canvas down with CSS
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
             
+            // Scale the context to ensure drawings are sharp
+            ctx.scale(dpr, dpr);
+
             // Restore the drawing
             const img = new Image();
             img.src = drawing;
             img.onload = () => {
-                ctx.drawImage(img, 0, 0);
+                // The restored image will be stretched but it's better than losing it.
+                // New drawings will be sharp.
+                ctx.drawImage(img, 0, 0, window.innerWidth, window.innerHeight);
             };
 
             ctx.lineCap = 'round';
@@ -192,24 +209,27 @@
             ctx.lineWidth = brushSize;
         }
 
-        function getMousePos(evt) {
+        function getEventPosition(evt) {
             const rect = canvas.getBoundingClientRect();
+            const event = evt.touches ? evt.touches[0] : evt;
             return {
-                x: evt.clientX - rect.left,
-                y: evt.clientY - rect.top
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top
             };
         }
 
         function startDrawing(e) {
+            e.preventDefault();
             isDrawing = true;
-            const pos = getMousePos(e);
+            const pos = getEventPosition(e);
             ctx.beginPath();
             ctx.moveTo(pos.x, pos.y);
         }
 
         function draw(e) {
             if (!isDrawing) return;
-            const pos = getMousePos(e);
+            e.preventDefault();
+            const pos = getEventPosition(e);
             ctx.lineTo(pos.x, pos.y);
             ctx.stroke();
         }
@@ -219,18 +239,28 @@
         }
 
         function switchColor(e) {
-            brushColor = e.target.dataset.color;
-            ctx.strokeStyle = brushColor;
+            const colorName = e.target.dataset.color;
+            if (colorMap[colorName]) {
+                brushColor = `rgba(${colorMap[colorName]}, 0.8)`;
+                ctx.strokeStyle = brushColor;
+            }
             colorBoxes.forEach(box => box.classList.remove('active'));
             e.target.classList.add('active');
         }
 
         window.addEventListener('resize', resizeCanvas);
         
+        // Mouse events
         canvas.addEventListener('mousedown', startDrawing);
         canvas.addEventListener('mousemove', draw);
         canvas.addEventListener('mouseup', stopDrawing);
         canvas.addEventListener('mouseout', stopDrawing);
+
+        // Touch events
+        canvas.addEventListener('touchstart', startDrawing, { passive: false });
+        canvas.addEventListener('touchmove', draw, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing);
+
 
         colorBoxes.forEach(box => {
             box.addEventListener('click', switchColor);
