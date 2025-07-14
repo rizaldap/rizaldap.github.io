@@ -21,7 +21,9 @@ jobs:
           ssh-keyscan -H ${{ secrets.VM_IP }} >> ~/.ssh/known_hosts
 
       - name: Install rsync
-        run: sudo apt-get update && sudo apt-get install -y rsync
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rsync
 
       - name: Rsync files to VM
         run: |
