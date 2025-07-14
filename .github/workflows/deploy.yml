@@ -1,0 +1,36 @@
+name: Auto Deploy to GCP VM (via rsync)
+
+on:
+  push:
+    branches:
+      - main  # ubah kalau kamu pakai branch lain
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VM_IP }} >> ~/.ssh/known_hosts
+
+      - name: Rsync files to VM
+        run: |
+          rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa" ./ ${{ secrets.VM_USER }}@${{ secrets.VM_IP }}:~/web-temp/
+
+      - name: Build and run Docker container on VM
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_IP }} << 'EOF'
+            cd ~/web-temp
+            docker stop rizal-web || true
+            docker rm rizal-web || true
+            docker rmi rizaldap-web || true
+            docker build -t rizaldap-web .
+            docker run -d -p 8080:80 --name rizal-web rizaldap-web
+          EOF
